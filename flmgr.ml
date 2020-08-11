@@ -2,14 +2,17 @@ open Curses
 open Cmdliner
 
 (*  applies f to each line in stdin.
-    if f returns true then continue else stop. *)
-let rec iter_stdin_lines (f: string -> bool) =
+    if f returns Ok then continue else stop. *)
+let rec iter_stdin_lines f =
     let try_read_line () = 
         try Some (read_line ())
         with End_of_file -> None in
-    match try_read_line () with
-        | None -> ()
-        | Some line -> if f line then (iter_stdin_lines [@tailcall]) f;;
+    let result = (match try_read_line () with
+        | None -> `Ok ()
+        | Some line -> f line) in
+    match result with
+        | `Ok () -> (iter_stdin_lines [@tailcall]) f
+        | _ -> result;;
 
 let handle_input cmd_template replace_string verbose input =
     (* replace special pattern in command with input *)
@@ -17,7 +20,7 @@ let handle_input cmd_template replace_string verbose input =
     (* show command then execute it *)
     let exec_cmd () =
         if verbose then ignore (addstr (cmd ^ "\n") && refresh ());
-        Sys.command cmd == 0 in
+        Sys.command cmd in
     (* string to show on prompt *)
     let prompt_str = Printf.sprintf "%s: Execute command '%s'? (y/n/a) " input cmd in
     let rec handle_keypress () =
@@ -29,15 +32,20 @@ let handle_input cmd_template replace_string verbose input =
             | _ -> false);
         match ch with
             (* abort *)
-            | 'a' -> false
+            | 'a' -> `Error(false, "Aborted")
             (* do nothing and continue to next input *)
-            | 'n' -> true
+            | 'n' -> `Ok ()
             (* apply command on input, continue if command executed successfully *)
-            | 'y' -> exec_cmd ()
+            | 'y' -> (match exec_cmd () with
+                        | 0 -> `Ok ()
+                        | code -> `Error (false, Printf.sprintf "Aborted (%d)" code))
             (* invalid keypress, try again *)
             | _ -> (handle_keypress [@tailcall]) () in
     (* show prompt and handle keypresses *)
-    addstr prompt_str && refresh () && handle_keypress ();;
+    if addstr prompt_str && refresh () then
+        handle_keypress ()
+    else
+        `Error (false, "Curses error.")
 
 (*  curses will clear the screen on init by default, this disables that.
     not really sure if this is the right way to do this. *)
@@ -59,10 +67,10 @@ let cmd_template =
 let flmgr cmd_template replace_string verbose =
     if Unix.isatty Unix.stdout then (
         ignore @@ newterm "xterm" Unix.stdin Unix.stdout;
-        if refresh () &&  exit_ca_mode () && noecho () then
-            `Ok (iter_stdin_lines @@ handle_input cmd_template replace_string verbose)
+        if refresh () && exit_ca_mode () && noecho () then
+            iter_stdin_lines @@ handle_input cmd_template replace_string verbose
         else
-            `Error (false, "Something went wrong with curses."))
+            `Error (false, "Curses error."))
     else
         `Error (false, "Shell is not interactive.");;
 
