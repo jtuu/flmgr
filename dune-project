@@ -1,3 +1,3 @@
 (lang dune 2.6)
-(name flmgr)
+(name ilpu)
 (license MIT)

@@ -95,7 +95,7 @@ let aux_cmd_template =
     let doc = "An auxiliary command that can be executed just like $(i,CMD) but executing it will not move to the next input line." in
     Arg.(value & opt (some string) None & info ["aux"] ~docv:"AUX" ~doc);;
 
-let flmgr cmd_template aux_cmd_template replace_string verbose =
+let ilpu cmd_template aux_cmd_template replace_string verbose =
     if Unix.isatty Unix.stdout then (
         ignore @@ newterm "xterm" Unix.stdin Unix.stdout;
         if refresh () && exit_ca_mode () && noecho () then
@@ -107,7 +107,7 @@ let flmgr cmd_template aux_cmd_template replace_string verbose =
 
 let main =
     let doc = "execute command lines from standard input interactively" in
-    Term.(ret (const flmgr $ cmd_template $ aux_cmd_template $ replace_string $ verbose)),
-    Term.info "flmgr" ~doc;;
+    Term.(ret (const ilpu $ cmd_template $ aux_cmd_template $ replace_string $ verbose)),
+    Term.info "ilpu" ~doc;;
 
 let () = Term.(exit @@ eval main);;

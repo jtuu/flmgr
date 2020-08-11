@@ -1,3 +1,3 @@
 (executable
- (name flmgr)
+ (name ilpu)
  (libraries curses unix str cmdliner))
