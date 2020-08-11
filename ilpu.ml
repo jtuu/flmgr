@@ -23,7 +23,7 @@ let handle_input cmd_template aux_cmd_template replace_string verbose input =
                     | None -> None in
     (* show command then execute it *)
     let exec_cmd cmd =
-        if verbose then ignore (addstr (cmd ^ "\n") && refresh ());
+        if verbose then (print_string (cmd ^ "\r\n"); flush stdout;);
         Sys.command cmd in
     (* string to show on prompt *)
     let prompt_str =
@@ -42,10 +42,9 @@ let handle_input cmd_template aux_cmd_template replace_string verbose input =
         let ch = Char.chr (getch ()) in
         if valid_keypress ch then (
             (* print keypress unless it's 'a' because it's ugly *)
-            if ch == 'a' then
-                (if verbose then ignore (addstr "\n");)
-            else
-                (ignore (addstr (Printf.sprintf "%c\n" ch) && refresh ()));
+            if ch == 'a' then (if verbose then print_string "\r\n")
+            else (Printf.printf "%c\r\n" ch);
+            flush stdout;
             match ch with
                 (* quit *)
                 | 'q' -> `Error (false, "Quit")
@@ -65,14 +64,11 @@ let handle_input cmd_template aux_cmd_template replace_string verbose input =
             (* invalid keypress, try again *)
             (handle_keypress [@tailcall]) () in
     (* return carriage in case command output caused it to move *)
-    Printf.printf "\r";
+    print_string "\r";
     (* show prompt and handle keypresses *)
-    if addstr prompt_str && refresh () then (
-        let result = handle_keypress () in
-        
-        result)
-    else
-        `Error (false, "Curses error.")
+    print_string prompt_str;
+    flush stdout;
+    handle_keypress ();;
 
 (*  curses will clear the screen on init by default, this disables that.
     not really sure if this is the right way to do this. *)
