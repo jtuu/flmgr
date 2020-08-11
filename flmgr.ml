@@ -41,6 +41,8 @@ let handle_input cmd_template replace_string verbose input =
                         | code -> `Error (false, Printf.sprintf "Aborted (%d)" code))
             (* invalid keypress, try again *)
             | _ -> (handle_keypress [@tailcall]) () in
+    (* return carriage in case command output caused it to move *)
+    Printf.printf "\r";
     (* show prompt and handle keypresses *)
     if addstr prompt_str && refresh () then
         handle_keypress ()
