@@ -1,4 +1,5 @@
 open Curses
+open Cmdliner
 
 (*  applies f to each line in stdin.
     if f returns true then continue else stop. *)
@@ -10,11 +11,13 @@ let rec iter_stdin_lines (f: string -> bool) =
         | None -> ()
         | Some line -> if f line then (iter_stdin_lines [@tailcall]) f;;
 
-let handle_input cmd_template input =
+let handle_input cmd_template replace_string verbose input =
     (* replace special pattern in command with input *)
-    let cmd = Str.global_replace (Str.regexp "{}") input cmd_template in
+    let cmd = Str.global_replace (Str.regexp replace_string) input cmd_template in
     (* show command then execute it *)
-    let exec_cmd () = ignore (addstr (cmd ^ "\n") && refresh ()); (Sys.command cmd) == 0 in
+    let exec_cmd () =
+        if verbose then ignore (addstr (cmd ^ "\n") && refresh ());
+        Sys.command cmd == 0 in
     (* string to show on prompt *)
     let prompt_str = Printf.sprintf "%s: Execute command '%s'? (y/n/a) " input cmd in
     let rec handle_keypress () =
@@ -40,11 +43,32 @@ let handle_input cmd_template input =
     not really sure if this is the right way to do this. *)
 let exit_ca_mode () = tputs "\x1b[r\x1b[?1049l" 0 (print_char);;
 
-let screen = newterm "xterm" Unix.stdin Unix.stdout;;
-refresh ();;
-exit_ca_mode ();;
-noecho ();;
-iter_stdin_lines (handle_input "echo {}");;
+(* command line arguments *)
+let verbose = 
+    let doc = "Print commands before executing them." in
+    Arg.(value & flag & info ["v"] ~doc);;
 
-(*  TODO: take command template from argument.
-    TODO: separate "check" command (e.g. feh) and "work" command (e.g. mv). *)
+let replace_string = 
+    let doc = "Occurrences of $(i,REPLACE_STR) will be replaced in $(i,CMD) with lines read from stdin." in
+    Arg.(value & opt string "{}" & info ["I"] ~docv:"REPLACE_STR" ~doc);;
+
+let cmd_template =
+    let doc = "The command to execute for each line of input. Execution is stopped if the command returns an exit code other than 0." in
+    Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"CMD" ~doc);;
+
+let flmgr cmd_template replace_string verbose =
+    if Unix.isatty Unix.stdout then (
+        ignore @@ newterm "xterm" Unix.stdin Unix.stdout;
+        if refresh () &&  exit_ca_mode () && noecho () then
+            `Ok (iter_stdin_lines @@ handle_input cmd_template replace_string verbose)
+        else
+            `Error (false, "Something went wrong with curses."))
+    else
+        `Error (false, "Shell is not interactive.");;
+
+let main =
+    let doc = "execute command lines from standard input interactively" in
+    Term.(ret (const flmgr $ cmd_template $ replace_string $ verbose)),
+    Term.info "flmgr" ~doc;;
+
+let () = Term.(exit @@ eval main);;
