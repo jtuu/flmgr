@@ -8,10 +8,10 @@ let rec iter_stdin_lines f =
         try Some (read_line ())
         with End_of_file -> None in
     let result = (match try_read_line () with
-        | None -> `Ok ()
+        | None -> `Ok (false)
         | Some line -> f line) in
     match result with
-        | `Ok () -> (iter_stdin_lines [@tailcall]) f
+        | `Ok should_continue -> (if should_continue then (iter_stdin_lines [@tailcall]) f else `Ok true)
         | _ -> result;;
 
 let handle_input cmd_template aux_cmd_template replace_string verbose input =
@@ -53,10 +53,10 @@ let handle_input cmd_template aux_cmd_template replace_string verbose input =
                             | Some aux -> ignore (exec_cmd aux); (handle_keypress [@tailcall]) ()
                             | None -> `Error (false, "Aux command is undefined."))
                 (* do nothing and continue to next input *)
-                | 'n' -> `Ok ()
+                | 'n' -> `Ok true
                 (* apply command on input, continue if command executed successfully *)
                 | 'y' -> (match exec_cmd main_cmd with
-                            | 0 -> `Ok ()
+                            | 0 -> `Ok true
                             | code -> `Error (false, Printf.sprintf "Aborted (%d)" code))
                 (* this shouldn't happen... *)
                 | _ -> `Error (false, "Invalid keypress."))
